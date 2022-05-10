@@ -183,14 +183,14 @@ func (u *uc) RegWriteBatch128(regs []int, lows []uint64, highs []uint64) error {
 	}
 	cvals := make([]C.neon_128_t, len(regs))
 	for i, v := range lows {
-		cregs[i].low = C.uint64_t(v)
+		cvals[i].low = C.uint64_t(v)
 	}
 	for i, v := range highs {
-		cregs[i].high = C.uint64_t(v)
+		cvals[i].high = C.uint64_t(v)
 	}
 	cregsPointer := (*C.int)(unsafe.Pointer(&cregs[0]))
 	cvalsPointer := (*C.neon_128_t)(unsafe.Pointer(&cvals[0]))
-	ucerr := C.uc_reg_write_batch_helper(u.handle, cregsPointer, cvalsPointer, C.int(len(regs)))
+	ucerr := C.uc_reg_write_batch_helper128(u.handle, cregsPointer, cvalsPointer, C.int(len(regs)))
 	return errReturn(ucerr)
 }
 
@@ -220,12 +220,12 @@ func (u *uc) RegReadBatch128(regs []int) ([]uint64, []uint64, error) {
 	cregsPointer := (*C.int)(unsafe.Pointer(&cregs[0]))
 	vals := make([]C.neon_128_t, len(regs))
 	cvalsPointer := (*C.neon_128_t)(unsafe.Pointer(&vals[0]))
-	ucerr := C.uc_reg_read_batch_helper(u.handle, cregsPointer, cvalsPointer, C.int(len(regs)))
+	ucerr := C.uc_reg_read_batch_helper128(u.handle, cregsPointer, cvalsPointer, C.int(len(regs)))
 	lows := make([]uint64, len(vals))
 	highs := make([]uint64, len(vals))
 	for i, val := range vals {
-		lows[i] = vals[i].low
-		highs[i] = vals[i].high
+		lows[i] = uint64(val.low)
+		highs[i] = uint64(val.high)
 	}
 	return lows, highs, errReturn(ucerr)
 }
