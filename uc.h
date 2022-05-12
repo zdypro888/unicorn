@@ -2,6 +2,8 @@
 typedef struct {
     uint64_t low;
     uint64_t high;
+    uint64_t pad_a;
+    uint64_t pad_b;
 } neon_128_t;
 
 uc_err uc_reg_read_batch_helper(uc_engine *handle, int *regs, uint64_t *val_out, int count);
