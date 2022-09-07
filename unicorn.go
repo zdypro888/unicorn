@@ -46,10 +46,12 @@ type Unicorn interface {
 	MemWrite(addr uint64, data []byte) error
 	RegRead(reg int) (uint64, error)
 	RegRead128(reg int) (uint64, uint64, error)
+	RegReadPointer(reg int, value unsafe.Pointer) error
 	RegReadBatch(regs []int) ([]uint64, error)
 	RegReadBatch128(regs []int) ([]uint64, []uint64, error)
 	RegWrite(reg int, value uint64) error
 	RegWrite128(reg int, low, high uint64) error
+	RegWritePointer(reg int, value unsafe.Pointer) error
 	RegWriteBatch(regs []int, vals []uint64) error
 	RegWriteBatch128(regs []int, lows, highs []uint64) error
 	RegReadMmr(reg int) (*X86Mmr, error)
