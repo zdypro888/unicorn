@@ -70,6 +70,52 @@ type Unicorn interface {
 	SetCPUModel(model int) error
 }
 
+func (cp *ARMCPReg) ToPointer() unsafe.Pointer {
+	var cpreg C.uc_arm_cp_reg
+	cpreg.cp = C.uint32_t(cp.CP)
+	cpreg.is64 = C.uint32_t(cp.IS64)
+	cpreg.sec = C.uint32_t(cp.Sec)
+	cpreg.crn = C.uint32_t(cp.CRN)
+	cpreg.crm = C.uint32_t(cp.CRM)
+	cpreg.opc1 = C.uint32_t(cp.Opc1)
+	cpreg.opc2 = C.uint32_t(cp.Opc2)
+	cpreg.val = C.uint64_t(cp.Val)
+	return unsafe.Pointer(&cpreg)
+}
+
+func (cp *ARMCPReg) FromPointer(pointer unsafe.Pointer) {
+	cpreg := (*C.uc_arm_cp_reg)(pointer)
+	cp.CP = uint32(cpreg.cp)
+	cp.IS64 = uint32(cpreg.is64)
+	cp.Sec = uint32(cpreg.sec)
+	cp.CRN = uint32(cpreg.crn)
+	cp.CRM = uint32(cpreg.crm)
+	cp.Opc1 = uint32(cpreg.opc1)
+	cp.Opc2 = uint32(cpreg.opc2)
+	cp.Val = uint64(cpreg.val)
+}
+
+func (cp *ARM64CPReg) Pointer() unsafe.Pointer {
+	var cpreg C.uc_arm64_cp_reg
+	cpreg.crn = C.uint32_t(cp.CRN)
+	cpreg.crm = C.uint32_t(cp.CRM)
+	cpreg.op0 = C.uint32_t(cp.Op0)
+	cpreg.op1 = C.uint32_t(cp.Op1)
+	cpreg.op2 = C.uint32_t(cp.Op2)
+	cpreg.val = C.uint64_t(cp.Val)
+	return unsafe.Pointer(&cpreg)
+}
+
+func (cp *ARM64CPReg) FromPointer(pointer unsafe.Pointer) {
+	cpreg := (*C.uc_arm64_cp_reg)(pointer)
+	cp.CRN = uint32(cpreg.crn)
+	cp.CRM = uint32(cpreg.crm)
+	cp.Op0 = uint32(cpreg.op0)
+	cp.Op1 = uint32(cpreg.op1)
+	cp.Op2 = uint32(cpreg.op2)
+	cp.Val = uint64(cpreg.val)
+}
+
 type uc struct {
 	handle *C.uc_engine
 	final  sync.Once
@@ -129,28 +175,36 @@ func (u *uc) Stop() error {
 
 func (u *uc) RegWrite(reg int, value uint64) error {
 	var val C.uint64_t = C.uint64_t(value)
-	ucerr := C.uc_reg_write(u.handle, C.int(reg), unsafe.Pointer(&val))
-	return errReturn(ucerr)
+	return u.RegWritePointer(reg, unsafe.Pointer(&val))
 }
 
 func (u *uc) RegWrite128(reg int, low, high uint64) error {
 	var val C.neon_128_t
 	val.low = C.uint64_t(low)
 	val.high = C.uint64_t(high)
-	ucerr := C.uc_reg_write(u.handle, C.int(reg), unsafe.Pointer(&val))
+	return u.RegWritePointer(reg, unsafe.Pointer(&val))
+}
+
+func (u *uc) RegWritePointer(reg int, value unsafe.Pointer) error {
+	ucerr := C.uc_reg_write(u.handle, C.int(reg), value)
 	return errReturn(ucerr)
 }
 
 func (u *uc) RegRead(reg int) (uint64, error) {
 	var val C.uint64_t
-	ucerr := C.uc_reg_read(u.handle, C.int(reg), unsafe.Pointer(&val))
-	return uint64(val), errReturn(ucerr)
+	err := u.RegReadPointer(reg, unsafe.Pointer(&val))
+	return uint64(val), err
 }
 
 func (u *uc) RegRead128(reg int) (uint64, uint64, error) {
 	var val C.neon_128_t
-	ucerr := C.uc_reg_read(u.handle, C.int(reg), unsafe.Pointer(&val))
-	return uint64(val.low), uint64(val.high), errReturn(ucerr)
+	err := u.RegReadPointer(reg, unsafe.Pointer(&val))
+	return uint64(val.low), uint64(val.high), err
+}
+
+func (u *uc) RegReadPointer(reg int, value unsafe.Pointer) error {
+	ucerr := C.uc_reg_read(u.handle, C.int(reg), value)
+	return errReturn(ucerr)
 }
 
 func (u *uc) RegWriteBatch(regs []int, vals []uint64) error {
