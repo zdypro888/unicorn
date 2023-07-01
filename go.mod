@@ -1,3 +1,3 @@
 module github.com/zdypro888/unicorn
 
-go 1.18
+go 1.20
