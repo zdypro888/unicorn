@@ -1,3 +1,5 @@
+#include <unicorn/unicorn.h>
+
 typedef struct {
     uint64_t low;
     uint64_t high;

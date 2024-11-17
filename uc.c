@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <unicorn/unicorn.h>
 #include "uc.h"
 #include "_cgo_export.h"
 
