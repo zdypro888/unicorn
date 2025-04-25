@@ -1,4 +1,4 @@
-#include <unicorn/unicorn.h>
+#include "hook.h"
 #include "_cgo_export.h"
 
 uc_err uc_hook_add(uc_engine *uc, uc_hook *hh, int type, void *callback,
@@ -39,4 +39,8 @@ void hookX86Out_cgo(uc_engine *handle, uint32_t port, uint32_t size, uint32_t va
 
 void hookX86Syscall_cgo(uc_engine *handle, uintptr_t user) {
     hookX86Syscall(handle, (void *)user);
+}
+
+int hookX86Cpuid_cgo(uc_engine *handle, uintptr_t user) {
+    return hookX86Cpuid(handle, (void *)user);
 }

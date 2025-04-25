@@ -334,12 +334,3 @@ const (
 	ARM64_INS_SYSL = 4
 	ARM64_INS_ENDING = 5
 )
-
-type ARM64CPReg struct {
-	CRN uint32 // Coprocessor register number
-	CRM uint32 // Coprocessor register number
-	Op0 uint32 // Opcode1
-	Op1 uint32 // Opcode1
-	Op2 uint32 // Opcode2
-	Val uint64 // The value to read/write
-}

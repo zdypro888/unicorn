@@ -1,16 +1,12 @@
 package unicorn
 
 import (
-	"fmt"
 	"runtime"
 	"sync"
 	"unsafe"
 )
 
 /*
-#cgo CFLAGS: -O3 -Wall -Werror -I/usr/local/include
-#cgo LDFLAGS: -L../../../ -lunicorn -Wl,-rpath,/usr/local/lib
-#cgo linux LDFLAGS: -L../../../ -lunicorn -lrt -Wl,-rpath,/usr/local/lib
 #include <unicorn/unicorn.h>
 #include "uc.h"
 */
@@ -45,15 +41,9 @@ type Unicorn interface {
 	MemReadInto(dst []byte, addr uint64) error
 	MemWrite(addr uint64, data []byte) error
 	RegRead(reg int) (uint64, error)
-	RegRead128(reg int) (uint64, uint64, error)
-	RegReadPointer(reg int, value unsafe.Pointer) error
 	RegReadBatch(regs []int) ([]uint64, error)
-	RegReadBatch128(regs []int) ([]uint64, []uint64, error)
 	RegWrite(reg int, value uint64) error
-	RegWrite128(reg int, low, high uint64) error
-	RegWritePointer(reg int, value unsafe.Pointer) error
 	RegWriteBatch(regs []int, vals []uint64) error
-	RegWriteBatch128(regs []int, lows, highs []uint64) error
 	RegReadMmr(reg int) (*X86Mmr, error)
 	RegWriteMmr(reg int, value *X86Mmr) error
 	Start(begin, until uint64) error
@@ -70,52 +60,6 @@ type Unicorn interface {
 	RegWriteX86Msr(reg uint64, val uint64) error
 	RegReadX86Msr(reg uint64) (uint64, error)
 	SetCPUModel(model int) error
-}
-
-func (cp *ARMCPReg) ToPointer() unsafe.Pointer {
-	var cpreg C.uc_arm_cp_reg
-	cpreg.cp = C.uint32_t(cp.CP)
-	cpreg.is64 = C.uint32_t(cp.IS64)
-	cpreg.sec = C.uint32_t(cp.Sec)
-	cpreg.crn = C.uint32_t(cp.CRN)
-	cpreg.crm = C.uint32_t(cp.CRM)
-	cpreg.opc1 = C.uint32_t(cp.Opc1)
-	cpreg.opc2 = C.uint32_t(cp.Opc2)
-	cpreg.val = C.uint64_t(cp.Val)
-	return unsafe.Pointer(&cpreg)
-}
-
-func (cp *ARMCPReg) FromPointer(pointer unsafe.Pointer) {
-	cpreg := (*C.uc_arm_cp_reg)(pointer)
-	cp.CP = uint32(cpreg.cp)
-	cp.IS64 = uint32(cpreg.is64)
-	cp.Sec = uint32(cpreg.sec)
-	cp.CRN = uint32(cpreg.crn)
-	cp.CRM = uint32(cpreg.crm)
-	cp.Opc1 = uint32(cpreg.opc1)
-	cp.Opc2 = uint32(cpreg.opc2)
-	cp.Val = uint64(cpreg.val)
-}
-
-func (cp *ARM64CPReg) Pointer() unsafe.Pointer {
-	var cpreg C.uc_arm64_cp_reg
-	cpreg.crn = C.uint32_t(cp.CRN)
-	cpreg.crm = C.uint32_t(cp.CRM)
-	cpreg.op0 = C.uint32_t(cp.Op0)
-	cpreg.op1 = C.uint32_t(cp.Op1)
-	cpreg.op2 = C.uint32_t(cp.Op2)
-	cpreg.val = C.uint64_t(cp.Val)
-	return unsafe.Pointer(&cpreg)
-}
-
-func (cp *ARM64CPReg) FromPointer(pointer unsafe.Pointer) {
-	cpreg := (*C.uc_arm64_cp_reg)(pointer)
-	cp.CRN = uint32(cpreg.crn)
-	cp.CRM = uint32(cpreg.crm)
-	cp.Op0 = uint32(cpreg.op0)
-	cp.Op1 = uint32(cpreg.op1)
-	cp.Op2 = uint32(cpreg.op2)
-	cp.Val = uint64(cpreg.val)
 }
 
 type uc struct {
@@ -177,36 +121,14 @@ func (u *uc) Stop() error {
 
 func (u *uc) RegWrite(reg int, value uint64) error {
 	var val C.uint64_t = C.uint64_t(value)
-	return u.RegWritePointer(reg, unsafe.Pointer(&val))
-}
-
-func (u *uc) RegWrite128(reg int, low, high uint64) error {
-	var val C.neon_128_t
-	val.low = C.uint64_t(low)
-	val.high = C.uint64_t(high)
-	return u.RegWritePointer(reg, unsafe.Pointer(&val))
-}
-
-func (u *uc) RegWritePointer(reg int, value unsafe.Pointer) error {
-	ucerr := C.uc_reg_write(u.handle, C.int(reg), value)
+	ucerr := C.uc_reg_write(u.handle, C.int(reg), unsafe.Pointer(&val))
 	return errReturn(ucerr)
 }
 
 func (u *uc) RegRead(reg int) (uint64, error) {
 	var val C.uint64_t
-	err := u.RegReadPointer(reg, unsafe.Pointer(&val))
-	return uint64(val), err
-}
-
-func (u *uc) RegRead128(reg int) (uint64, uint64, error) {
-	var val C.neon_128_t
-	err := u.RegReadPointer(reg, unsafe.Pointer(&val))
-	return uint64(val.low), uint64(val.high), err
-}
-
-func (u *uc) RegReadPointer(reg int, value unsafe.Pointer) error {
-	ucerr := C.uc_reg_read(u.handle, C.int(reg), value)
-	return errReturn(ucerr)
+	ucerr := C.uc_reg_read(u.handle, C.int(reg), unsafe.Pointer(&val))
+	return uint64(val), errReturn(ucerr)
 }
 
 func (u *uc) RegWriteBatch(regs []int, vals []uint64) error {
@@ -226,30 +148,6 @@ func (u *uc) RegWriteBatch(regs []int, vals []uint64) error {
 	return errReturn(ucerr)
 }
 
-func (u *uc) RegWriteBatch128(regs []int, lows []uint64, highs []uint64) error {
-	if len(regs) == 0 {
-		return nil
-	}
-	if len(lows) < len(regs) || len(lows) != len(highs) {
-		return fmt.Errorf("read slice not match: %d %d %d", len(regs), len(lows), len(highs))
-	}
-	cregs := make([]C.int, len(regs))
-	for i, v := range regs {
-		cregs[i] = C.int(v)
-	}
-	cvals := make([]C.neon_128_t, len(regs))
-	for i, v := range lows {
-		cvals[i].low = C.uint64_t(v)
-	}
-	for i, v := range highs {
-		cvals[i].high = C.uint64_t(v)
-	}
-	cregsPointer := (*C.int)(unsafe.Pointer(&cregs[0]))
-	cvalsPointer := (*C.neon_128_t)(unsafe.Pointer(&cvals[0]))
-	ucerr := C.uc_reg_write_batch_helper128(u.handle, cregsPointer, cvalsPointer, C.int(len(regs)))
-	return errReturn(ucerr)
-}
-
 func (u *uc) RegReadBatch(regs []int) ([]uint64, error) {
 	if len(regs) == 0 {
 		return nil, nil
@@ -265,27 +163,6 @@ func (u *uc) RegReadBatch(regs []int) ([]uint64, error) {
 	return vals, errReturn(ucerr)
 }
 
-func (u *uc) RegReadBatch128(regs []int) ([]uint64, []uint64, error) {
-	if len(regs) == 0 {
-		return nil, nil, nil
-	}
-	cregs := make([]C.int, len(regs))
-	for i, v := range regs {
-		cregs[i] = C.int(v)
-	}
-	cregsPointer := (*C.int)(unsafe.Pointer(&cregs[0]))
-	vals := make([]C.neon_128_t, len(regs))
-	cvalsPointer := (*C.neon_128_t)(unsafe.Pointer(&vals[0]))
-	ucerr := C.uc_reg_read_batch_helper128(u.handle, cregsPointer, cvalsPointer, C.int(len(regs)))
-	lows := make([]uint64, len(vals))
-	highs := make([]uint64, len(vals))
-	for i, val := range vals {
-		lows[i] = uint64(val.low)
-		highs[i] = uint64(val.high)
-	}
-	return lows, highs, errReturn(ucerr)
-}
-
 func (u *uc) MemRegions() ([]*MemRegion, error) {
 	var regions *C.uc_mem_region
 	var count C.uint32_t
@@ -293,19 +170,16 @@ func (u *uc) MemRegions() ([]*MemRegion, error) {
 	if ucerr != C.UC_ERR_OK {
 		return nil, errReturn(ucerr)
 	}
-	var ret []*MemRegion
-	if count > 0 {
-		ret = make([]*MemRegion, count)
-		tmp := (*[1 << 24]C.struct_uc_mem_region)(unsafe.Pointer(regions))[:count]
-		for i, v := range tmp {
-			ret[i] = &MemRegion{
-				Begin: uint64(v.begin),
-				End:   uint64(v.end),
-				Prot:  int(v.perms),
-			}
+	ret := make([]*MemRegion, count)
+	tmp := (*[1 << 24]C.struct_uc_mem_region)(unsafe.Pointer(regions))[:count]
+	for i, v := range tmp {
+		ret[i] = &MemRegion{
+			Begin: uint64(v.begin),
+			End:   uint64(v.end),
+			Prot:  int(v.perms),
 		}
-		C.uc_free(unsafe.Pointer(regions))
 	}
+	C.uc_free(unsafe.Pointer(regions))
 	return ret, nil
 }
 

@@ -193,14 +193,3 @@ const (
 	ARM_REG_FP = 77
 	ARM_REG_IP = 78
 )
-
-type ARMCPReg struct {
-	CP   uint32 // The coprocessor identifier
-	IS64 uint32 // Is it a 64 bit control register
-	Sec  uint32 // Security state
-	CRN  uint32 // Coprocessor register number
-	CRM  uint32 // Coprocessor register number
-	Opc1 uint32 // Opcode1
-	Opc2 uint32 // Opcode2
-	Val  uint64 // The value to read/write
-}
