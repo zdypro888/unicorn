@@ -1,4 +1,14 @@
 package unicorn
+
+import (
+	"unsafe"
+)
+
+/*
+#include <unicorn/unicorn.h>
+*/
+import "C"
+
 // For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT [arm64_const.go]
 const (
 
@@ -334,3 +344,33 @@ const (
 	ARM64_INS_SYSL = 4
 	ARM64_INS_ENDING = 5
 )
+
+type ARM64CPReg struct {
+	CRN uint32 // Coprocessor register number
+	CRM uint32 // Coprocessor register number
+	Op0 uint32 // Opcode1
+	Op1 uint32 // Opcode1
+	Op2 uint32 // Opcode2
+	Val uint64 // The value to read/write
+}
+
+func (cp *ARM64CPReg) Pointer() unsafe.Pointer {
+	var cpreg C.uc_arm64_cp_reg
+	cpreg.crn = C.uint32_t(cp.CRN)
+	cpreg.crm = C.uint32_t(cp.CRM)
+	cpreg.op0 = C.uint32_t(cp.Op0)
+	cpreg.op1 = C.uint32_t(cp.Op1)
+	cpreg.op2 = C.uint32_t(cp.Op2)
+	cpreg.val = C.uint64_t(cp.Val)
+	return unsafe.Pointer(&cpreg)
+}
+
+func (cp *ARM64CPReg) FromPointer(pointer unsafe.Pointer) {
+	cpreg := (*C.uc_arm64_cp_reg)(pointer)
+	cp.CRN = uint32(cpreg.crn)
+	cp.CRM = uint32(cpreg.crm)
+	cp.Op0 = uint32(cpreg.op0)
+	cp.Op1 = uint32(cpreg.op1)
+	cp.Op2 = uint32(cpreg.op2)
+	cp.Val = uint64(cpreg.val)
+}

@@ -1,4 +1,14 @@
 package unicorn
+
+import (
+	"unsafe"
+)
+
+/*
+#include <unicorn/unicorn.h>
+*/
+import "C"
+
 // For Unicorn Engine. AUTO-GENERATED FILE, DO NOT EDIT [arm_const.go]
 const (
 
@@ -193,3 +203,39 @@ const (
 	ARM_REG_FP = 77
 	ARM_REG_IP = 78
 )
+
+type ARMCPReg struct {
+	CP   uint32 // The coprocessor identifier
+	IS64 uint32 // Is it a 64 bit control register
+	Sec  uint32 // Security state
+	CRN  uint32 // Coprocessor register number
+	CRM  uint32 // Coprocessor register number
+	Opc1 uint32 // Opcode1
+	Opc2 uint32 // Opcode2
+	Val  uint64 // The value to read/write
+}
+
+func (cp *ARMCPReg) ToPointer() unsafe.Pointer {
+	var cpreg C.uc_arm_cp_reg
+	cpreg.cp = C.uint32_t(cp.CP)
+	cpreg.is64 = C.uint32_t(cp.IS64)
+	cpreg.sec = C.uint32_t(cp.Sec)
+	cpreg.crn = C.uint32_t(cp.CRN)
+	cpreg.crm = C.uint32_t(cp.CRM)
+	cpreg.opc1 = C.uint32_t(cp.Opc1)
+	cpreg.opc2 = C.uint32_t(cp.Opc2)
+	cpreg.val = C.uint64_t(cp.Val)
+	return unsafe.Pointer(&cpreg)
+}
+
+func (cp *ARMCPReg) FromPointer(pointer unsafe.Pointer) {
+	cpreg := (*C.uc_arm_cp_reg)(pointer)
+	cp.CP = uint32(cpreg.cp)
+	cp.IS64 = uint32(cpreg.is64)
+	cp.Sec = uint32(cpreg.sec)
+	cp.CRN = uint32(cpreg.crn)
+	cp.CRM = uint32(cpreg.crm)
+	cp.Opc1 = uint32(cpreg.opc1)
+	cp.Opc2 = uint32(cpreg.opc2)
+	cp.Val = uint64(cpreg.val)
+}
