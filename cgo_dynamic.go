@@ -2,5 +2,5 @@
 
 package unicorn
 
-// #cgo LDFLAGS: -lunicorn
+// #cgo LDFLAGS: -lunicorn -Wl,-rpath,/usr/local/lib
 import "C"
