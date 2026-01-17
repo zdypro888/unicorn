@@ -66,7 +66,26 @@ type Unicorn interface {
 	Handle() *C.uc_engine
 	RegWriteX86Msr(reg uint64, val uint64) error
 	RegReadX86Msr(reg uint64) (uint64, error)
+
+	// uc_ctl APIs (Unicorn 2.x)
 	SetCPUModel(model int) error
+	GetCPUModel() (int, error)
+	GetPageSize() (uint32, error)
+	SetPageSize(size uint32) error
+	GetMode() (int, error)
+	GetArch() (int, error)
+	GetTimeout() (uint64, error)
+	ExitsEnable() error
+	ExitsDisable() error
+	SetExits(exits []uint64) error
+	GetExits() ([]uint64, error)
+	GetExitsCount() (uint64, error)
+	FlushTB() error
+	FlushTLB() error
+	SetTLBMode(mode int) error
+	GetTCGBufferSize() (uint32, error)
+	SetTCGBufferSize(size uint32) error
+	RemoveCache(address, end uint64) error
 }
 
 type uc struct {
@@ -263,14 +282,14 @@ func (u *uc) MemWrite(addr uint64, data []byte) error {
 	if len(data) == 0 {
 		return nil
 	}
-	return errReturn(C.uc_mem_write(u.handle, C.uint64_t(addr), unsafe.Pointer(&data[0]), C.size_t(len(data))))
+	return errReturn(C.uc_mem_write(u.handle, C.uint64_t(addr), unsafe.Pointer(&data[0]), C.uint64_t(len(data))))
 }
 
 func (u *uc) MemReadInto(dst []byte, addr uint64) error {
 	if len(dst) == 0 {
 		return nil
 	}
-	return errReturn(C.uc_mem_read(u.handle, C.uint64_t(addr), unsafe.Pointer(&dst[0]), C.size_t(len(dst))))
+	return errReturn(C.uc_mem_read(u.handle, C.uint64_t(addr), unsafe.Pointer(&dst[0]), C.uint64_t(len(dst))))
 }
 
 func (u *uc) MemRead(addr, size uint64) ([]byte, error) {
@@ -279,7 +298,7 @@ func (u *uc) MemRead(addr, size uint64) ([]byte, error) {
 }
 
 func (u *uc) MemMapProt(addr, size uint64, prot int) error {
-	return errReturn(C.uc_mem_map(u.handle, C.uint64_t(addr), C.size_t(size), C.uint32_t(prot)))
+	return errReturn(C.uc_mem_map(u.handle, C.uint64_t(addr), C.uint64_t(size), C.uint32_t(prot)))
 }
 
 func (u *uc) MemMap(addr, size uint64) error {
@@ -287,15 +306,15 @@ func (u *uc) MemMap(addr, size uint64) error {
 }
 
 func (u *uc) MemMapPtr(addr, size uint64, prot int, ptr unsafe.Pointer) error {
-	return errReturn(C.uc_mem_map_ptr(u.handle, C.uint64_t(addr), C.size_t(size), C.uint32_t(prot), ptr))
+	return errReturn(C.uc_mem_map_ptr(u.handle, C.uint64_t(addr), C.uint64_t(size), C.uint32_t(prot), ptr))
 }
 
 func (u *uc) MemProtect(addr, size uint64, prot int) error {
-	return errReturn(C.uc_mem_protect(u.handle, C.uint64_t(addr), C.size_t(size), C.uint32_t(prot)))
+	return errReturn(C.uc_mem_protect(u.handle, C.uint64_t(addr), C.uint64_t(size), C.uint32_t(prot)))
 }
 
 func (u *uc) MemUnmap(addr, size uint64) error {
-	return errReturn(C.uc_mem_unmap(u.handle, C.uint64_t(addr), C.size_t(size)))
+	return errReturn(C.uc_mem_unmap(u.handle, C.uint64_t(addr), C.uint64_t(size)))
 }
 
 func (u *uc) Query(queryType int) (uint64, error) {
@@ -309,6 +328,99 @@ func (u *uc) Handle() *C.uc_engine {
 }
 
 func (u *uc) SetCPUModel(model int) error {
-	ucerr := C.uc_ctl_set_cpu_model_helper(u.handle, C.int(model))
-	return errReturn(ucerr)
+	return errReturn(C.uc_ctl_set_cpu_model_helper(u.handle, C.int(model)))
+}
+
+func (u *uc) GetCPUModel() (int, error) {
+	var model C.int
+	ucerr := C.uc_ctl_get_cpu_model_helper(u.handle, &model)
+	return int(model), errReturn(ucerr)
+}
+
+func (u *uc) GetPageSize() (uint32, error) {
+	var size C.uint32_t
+	ucerr := C.uc_ctl_get_page_size_helper(u.handle, &size)
+	return uint32(size), errReturn(ucerr)
+}
+
+func (u *uc) SetPageSize(size uint32) error {
+	return errReturn(C.uc_ctl_set_page_size_helper(u.handle, C.uint32_t(size)))
+}
+
+func (u *uc) GetMode() (int, error) {
+	var mode C.int
+	ucerr := C.uc_ctl_get_mode_helper(u.handle, &mode)
+	return int(mode), errReturn(ucerr)
+}
+
+func (u *uc) GetArch() (int, error) {
+	var arch C.int
+	ucerr := C.uc_ctl_get_arch_helper(u.handle, &arch)
+	return int(arch), errReturn(ucerr)
+}
+
+func (u *uc) GetTimeout() (uint64, error) {
+	var timeout C.uint64_t
+	ucerr := C.uc_ctl_get_timeout_helper(u.handle, &timeout)
+	return uint64(timeout), errReturn(ucerr)
+}
+
+func (u *uc) ExitsEnable() error {
+	return errReturn(C.uc_ctl_exits_enable_helper(u.handle))
+}
+
+func (u *uc) ExitsDisable() error {
+	return errReturn(C.uc_ctl_exits_disable_helper(u.handle))
+}
+
+func (u *uc) SetExits(exits []uint64) error {
+	if len(exits) == 0 {
+		return errReturn(C.uc_ctl_set_exits_helper(u.handle, nil, 0))
+	}
+	return errReturn(C.uc_ctl_set_exits_helper(u.handle, (*C.uint64_t)(unsafe.Pointer(&exits[0])), C.size_t(len(exits))))
+}
+
+func (u *uc) GetExitsCount() (uint64, error) {
+	var count C.size_t
+	ucerr := C.uc_ctl_get_exits_cnt_helper(u.handle, &count)
+	return uint64(count), errReturn(ucerr)
+}
+
+func (u *uc) GetExits() ([]uint64, error) {
+	count, err := u.GetExitsCount()
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, nil
+	}
+	exits := make([]uint64, count)
+	ucerr := C.uc_ctl_get_exits_helper(u.handle, (*C.uint64_t)(unsafe.Pointer(&exits[0])), C.size_t(count))
+	return exits, errReturn(ucerr)
+}
+
+func (u *uc) FlushTB() error {
+	return errReturn(C.uc_ctl_flush_tb_helper(u.handle))
+}
+
+func (u *uc) FlushTLB() error {
+	return errReturn(C.uc_ctl_flush_tlb_helper(u.handle))
+}
+
+func (u *uc) SetTLBMode(mode int) error {
+	return errReturn(C.uc_ctl_tlb_mode_helper(u.handle, C.int(mode)))
+}
+
+func (u *uc) GetTCGBufferSize() (uint32, error) {
+	var size C.uint32_t
+	ucerr := C.uc_ctl_get_tcg_buffer_size_helper(u.handle, &size)
+	return uint32(size), errReturn(ucerr)
+}
+
+func (u *uc) SetTCGBufferSize(size uint32) error {
+	return errReturn(C.uc_ctl_set_tcg_buffer_size_helper(u.handle, C.uint32_t(size)))
+}
+
+func (u *uc) RemoveCache(address, end uint64) error {
+	return errReturn(C.uc_ctl_remove_cache_helper(u.handle, C.uint64_t(address), C.uint64_t(end)))
 }

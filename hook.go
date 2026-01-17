@@ -42,8 +42,12 @@ func (m *fastHookMap) insert(h *HookData) uintptr {
 
 func (m *fastHookMap) get(i unsafe.Pointer) *HookData {
 	m.RLock()
-	// TODO: nil check?
-	v := m.vals[uintptr(i)]
+	idx := uintptr(i)
+	if idx >= uintptr(len(m.vals)) {
+		m.RUnlock()
+		return nil
+	}
+	v := m.vals[idx]
 	m.RUnlock()
 	return v
 }
@@ -116,6 +120,9 @@ func (u *uc) HookAdd(htype int, cb interface{}, begin, end uint64, extra ...int)
 	case HOOK_INTR:
 		callback = C.hookInterrupt_cgo
 	case HOOK_INSN:
+		if len(extra) == 0 {
+			return 0, errors.New("HOOK_INSN requires instruction type in extra parameter")
+		}
 		insn = C.int(extra[0])
 		insnMode = true
 		switch insn {
@@ -142,12 +149,16 @@ func (u *uc) HookAdd(htype int, cb interface{}, begin, end uint64, extra ...int)
 	var h2 C.uc_hook
 	data := &HookData{u, cb}
 	uptr := hookMap.insert(data)
+	var ucerr C.uc_err
 	if insnMode {
-		C.uc_hook_add_insn(u.handle, &h2, C.uc_hook_type(htype), callback, C.uintptr_t(uptr), C.uint64_t(begin), C.uint64_t(end), insn)
+		ucerr = C.uc_hook_add_insn(u.handle, &h2, C.uc_hook_type(htype), callback, C.uintptr_t(uptr), C.uint64_t(begin), C.uint64_t(end), insn)
 	} else {
-		C.uc_hook_add_wrap(u.handle, &h2, C.uc_hook_type(htype), callback, C.uintptr_t(uptr), C.uint64_t(begin), C.uint64_t(end))
+		ucerr = C.uc_hook_add_wrap(u.handle, &h2, C.uc_hook_type(htype), callback, C.uintptr_t(uptr), C.uint64_t(begin), C.uint64_t(end))
 	}
-	// TODO: could move Hook and uptr onto HookData and just return it
+	if ucerr != ERR_OK {
+		hookMap.remove(uptr)
+		return 0, UcError(ucerr)
+	}
 	u.hooks[Hook(h2)] = uptr
 	return Hook(h2), nil
 }
